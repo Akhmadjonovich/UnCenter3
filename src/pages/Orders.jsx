@@ -36,7 +36,7 @@ const Orders = () => {
     </div>;
 
   return (
-    <div className="p-6 bg-gray-50 mt-15 min-h-screen">
+    <div className="p-6 max-sm:p-0 bg-gray-50 mt-15 min-h-screen">
       <h1 className="text-2xl font-bold text-indigo-900 mb-6">
         Buyurtmalar ro'yxati
       </h1>
