@@ -1,0 +1,22 @@
+@import "tailwindcss";
+body{
+    
+    margin-right: auto;
+    margin-left: auto;
+}
+
+
+@keyframes shimmer {
+    0% {
+      background-position: -200px 0;
+    }
+    100% {
+      background-position: 200px 0;
+    }
+  }
+  
+  .animate-shimmer {
+    background-size: 400px 100%;
+    animation: shimmer 1.5s infinite linear;
+  }
+  
