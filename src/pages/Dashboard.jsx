@@ -145,10 +145,10 @@ const Dashboard = () => {
               filteredProducts.map((p) => (
                 <tr key={p.id} className="hover:bg-purple-50">
                   <td className="py-2 px-3 font-medium">{p.name}</td>
-                  <td className="py-2 px-3">{p.type}</td>
-                  <td className="py-2 px-3 font-semibold">{convert(p.price)} {currency}</td>
-                  <td className="py-2 px-3">{p.quantity}</td>
-                  <td className="py-2 px-3 font-semibold">{convert((p.price - (p.buyPrice || 0)) * p.quantity)} {currency}</td>
+                  <td className="py-2 px-3 text-center">{p.type}</td>
+                  <td className="py-2 px-3 font-semibold text-center">{convert(p.price)} {currency}</td>
+                  <td className="py-2 px-3 text-center">{p.quantity}</td>
+                  <td className="py-2 px-3 font-semibold ">{convert((p.price - (p.buyPrice || 0)) * p.quantity)} {currency}</td>
                 </tr>
               ))
             )}

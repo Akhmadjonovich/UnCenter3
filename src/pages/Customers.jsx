@@ -3,16 +3,19 @@ import { useState, useEffect } from "react";
 import { ref, onValue, push, update } from "firebase/database";
 import { db } from "../firebase";
 import { useParams, Link } from "react-router-dom";
+import Loading from "./Loading";
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState({});
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const customersRef = ref(db, "customers");
     onValue(customersRef, (snap) => {
       setCustomers(snap.val() || {});
+      setLoading(false);
     });
   }, []);
 
@@ -20,6 +23,8 @@ export default function CustomersPage() {
     c.name.toLowerCase().includes(search.toLowerCase())
   );
 
+  if (loading) return <Loading />;
+  
   return (
     <div className="p-6 max-sm:p-2 mt-16">
       <div className="flex justify-between items-center mb-6">
@@ -134,11 +139,13 @@ export function CustomerDetail() {
   const [sales, setSales] = useState({});
   const [payments, setPayments] = useState({});
   const [pay, setPay] = useState("");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const customerRef = ref(db, `customers/${id}`);
     const unsubscribeCustomer = onValue(customerRef, (snap) => {
       setCustomer(snap.val());
+      setLoading(false);
     });
 
     const salesRef = ref(db, "customerPurchases");
@@ -186,7 +193,7 @@ export function CustomerDetail() {
     setPay("");
   };
 
-  if (!customer) return <div className="p-6">Yuklanmoqda...</div>;
+  if (loading) return <Loading />;
 
   return (
     <div className="p-4 mt-16 flex flex-col md:flex-row gap-6">
