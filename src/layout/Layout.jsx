@@ -15,7 +15,7 @@ const Layout = ({ children }) => {
         <Navbar setIsOpenSelbar={setIsOpenSelbar}/>
 
         {/* Scroll bo‘ladigan joy */}
-        <div className="flex-1 max-sm:w-full overflow-y-auto p-6 text-gray-800">
+        <div className="flex-1 max-sm:w-full overflow-y-auto p-6 max-sm:px-2 text-gray-800">
           {children}
         </div>
       </div>

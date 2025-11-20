@@ -1,217 +1,160 @@
+// src/pages/Dashboard.jsx
 import React, { useEffect, useState } from "react";
-import { FaShoppingCart, FaUsers } from "react-icons/fa";
 import { FcMoneyTransfer } from "react-icons/fc";
+import { FaUsers, FaIndustry } from "react-icons/fa";
 import { db } from "../firebase";
 import { ref, onValue } from "firebase/database";
+import { useNavigate } from "react-router-dom";
 import Loading from "./Loading";
-const Dashboard = () => {
-  const [active, setActive] = useState("Barchasi");
-  const categories = ["Barchasi", "Un", "Yog'", "Tuz", "Novvoylar uchun"];
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [clientsCount, setClientsCount] = useState(0);
-  const [ordersCount, setOrdersCount] = useState(0);
+import { MdOutlineAddBusiness } from "react-icons/md";
 
-  // ✅ Ma’lumotlarni olish
+const Dashboard = () => {
+  const navigate = useNavigate();
+
+  const [products, setProducts] = useState([]);
+  const [factories, setFactories] = useState({});
+  const [customers, setCustomers] = useState({});
+  const [loading, setLoading] = useState(true);
+
+  const [activeCategory, setActiveCategory] = useState("Barchasi");
+  const categories = ["Barchasi", "Un", "Yog'", "Tuz", "Novvoylar maxsuloti"];
+
+  const [currency, setCurrency] = useState("UZS");
+  const [usdRate, setUsdRate] = useState(0);
+
   useEffect(() => {
-    const productsRef = ref(db, "products");
-    onValue(productsRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        const loadedProducts = Object.entries(data).map(([id, value]) => ({
-          id,
-          ...value,
-        }));
-        setProducts(loadedProducts);
-      } else {
-        setProducts([]);
-      }
-      setLoading(false)
-    });
+    fetch("https://api.exchangerate.host/latest?base=USD&symbols=UZS")
+      .then((res) => res.json())
+      .then((data) => data?.rates?.UZS && setUsdRate(data.rates.UZS))
+      .catch(console.error);
   }, []);
 
-  
   useEffect(() => {
-    const ordersRef = ref(db, "orders");
+    const productsRef = ref(db, "products");
+    const factoriesRef = ref(db, "factories");
+    const customersRef = ref(db, "customers");
 
-    // 🔁 Realtime listener
-    const unsubscribe = onValue(ordersRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        const ordersArray = Object.values(data);
-        const totalOrders = ordersArray.length;
-
-        // 🧮 Telefon raqam bo‘yicha unique mijozlar sonini hisoblash
-        const uniquePhones = new Set(
-          ordersArray
-            .map((order) => order.phoneNumber)
-            .filter((num) => !!num) // null/undefined ni olib tashlaydi
-        );
-
-        setOrdersCount(totalOrders);
-        setClientsCount(uniquePhones.size);
-      } else {
-        setOrdersCount(0);
-        setClientsCount(0);
-      }
-
+    onValue(productsRef, (snap) => {
+      const data = snap.val();
+      setProducts(data ? Object.entries(data).map(([id, p]) => ({ id, ...p })) : []);
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    onValue(factoriesRef, (snap) => setFactories(snap.val() || {}));
+
+    onValue(customersRef, (snap) => setCustomers(snap.val() || {}));
   }, []);
 
-  // ✅ Kategoriyalar bo‘yicha filtrlash
   const filteredProducts =
-    active === "Barchasi"
+    activeCategory === "Barchasi"
       ? products
-      : products.filter(
-          (item) =>
-            item.type?.toLowerCase() === active.toLowerCase() ||
-            (active === "Novvoylar uchun" && item.type === "novvoy")
+      : products.filter((p) =>
+          activeCategory === "Novvoylar maxsuloti"
+            ? p.type === "Novvoylar maxsuloti"
+            : p.type === activeCategory
         );
 
-  // ✅ Hisoblashlar
   const totalProfit = filteredProducts.reduce(
-    (sum, item) => sum + (item.price || 0) * (item.quantity || 0),
+    (sum, p) => sum + (p.price - (p.buyPrice || 0)) * (p.quantity || 0),
     0
   );
 
-  const totalProducts = filteredProducts.length;
-  const totalOrders = filteredProducts.reduce(
-    (sum, item) => sum + (item.quantity || 0),
+  const totalDebt = Object.values(factories).reduce(
+    (sum, f) => sum + (f.debt || 0),
     0
   );
 
-  
-  if (loading)
-    return <div>
-      <Loading/>
-    </div>;
+  const convert = (amount) =>
+    currency === "USD" ? (usdRate > 0 ? (amount / usdRate).toFixed(2) : 0) : amount.toLocaleString();
+
+  if (loading) return <Loading />;
 
   return (
-    <div>
-      {/* 📊 Statistikalar */}
-      <section className="mt-20 grid grid-cols-3 gap-4 max-lg:grid-cols-2 max-sm:grid-cols-1 p-4 max-lg:p-0 *:bg-white *:p-4 *:rounded-lg *:shadow-2xl">
-        <div className="flex items-center gap-4 max-lg:w-full">
-          <FcMoneyTransfer className="text-6xl max-lg:text-4xl bg-purple-100 p-2 rounded-lg" />
+    <div className="p-4 max-sm:p-2 mt-16 space-y-6">
+      {/* Stat cards */}
+      <div className="grid grid-cols-3 max-sm:grid-cols-1 gap-4">
+        <div
+          className="flex items-center gap-4 bg-white p-4 rounded shadow cursor-pointer"
+          onClick={() => navigate("/revenue-details")}
+        >
+          <FcMoneyTransfer className="text-6xl p-2 rounded bg-purple-100" />
           <div>
-            <h3 className="text-xl max-xl:text-lg font-semibold text-gray-500">
-              Umumiy Foyda
-            </h3>
-            <h4 className="text-xl max-xl:text-sm font-bold">
-              {totalProfit.toLocaleString()} so‘m
-            </h4>
+            <h3 className="text-gray-500 font-semibold">Umumiy daromad</h3>
+            <h2 className="text-xl font-bold">
+              {convert(totalProfit)} {currency}
+            </h2>
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          <FaUsers className="text-6xl max-lg:text-4xl text-[#155CA5] bg-purple-100 p-2 rounded-lg" />
+        <div className="flex items-center gap-4 bg-white p-4 rounded shadow">
+          <FaUsers className="text-6xl p-2 rounded bg-blue-100 text-blue-700" />
           <div>
-            <h3 className="text-xl max-xl:text-lg font-semibold text-gray-500">
-              Mijozlar
-            </h3>
-            <h4 className="text-xl max-xl:text-sm font-bold">
-              {clientsCount} ta
-            </h4>
+            <h3 className="text-gray-500 font-semibold">Mijozlar</h3>
+            <h2 className="text-xl font-bold">{Object.keys(customers).length}</h2>
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          <FaShoppingCart className="text-6xl max-lg:text-4xl text-[#155CA5] bg-purple-100 p-2 rounded-lg" />
+        <div className="flex items-center gap-4 bg-white p-4 rounded shadow">
+          <MdOutlineAddBusiness className="text-6xl p-2 rounded bg-green-100 text-green-700" />
           <div>
-            <h3 className="text-xl max-xl:text-lg font-semibold text-gray-500">
-              Buyurtmalar
-            </h3>
-            <h4 className="text-xl max-xl:text-sm font-bold">
-              {ordersCount} ta
-            </h4>
+            <h3 className="text-gray-500 font-semibold">Zavodlar / Umumiy qarz</h3>
+            <h2 className="text-xl font-bold">
+              {Object.keys(factories).length} / {convert(totalDebt)} {currency}
+            </h2>
           </div>
         </div>
-      </section>
+      </div>
 
-      {/* 🏷 Kategoriyalar */}
-      <section className="my-5 p-4 max-lg:p-0">
-        <h3 className="text-xl max-lg:text-lg font-bold">
-          Skladda mavjud mahsulotlar:
-        </h3>
+      {/* Categories */}
+      <div className="flex flex-wrap gap-2 bg-white p-3 rounded shadow">
+        {categories.map((c) => (
+          <button
+            key={c}
+            className={`px-4 py-2 rounded-full font-semibold ${
+              activeCategory === c
+                ? "bg-blue-600 text-white shadow-lg"
+                : "bg-gray-100 text-gray-700 hover:bg-blue-100"
+            }`}
+            onClick={() => setActiveCategory(c)}
+          >
+            {c}
+          </button>
+        ))}
+      </div>
 
-        <div className="mt-5 bg-white p-2 rounded-lg flex items-center shadow-2xl">
-          <div className="flex flex-wrap items-center gap-3 p-4 bg-white rounded-2xl">
-            {categories.map((category) => (
-              <button
-                key={category}
-                onClick={() => setActive(category)}
-                className={`px-5 py-2.5 rounded-full text-sm max-md:text-[10px] font-semibold transition-all duration-200 
-                  ${
-                    active === category
-                      ? "bg-[#155CA5] text-white shadow-lg scale-105"
-                      : "bg-gray-100 text-gray-700 hover:bg-blue-100"
-                  }`}
-              >
-                {category}
-              </button>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* 📦 Mahsulotlar jadvali */}
-      <section className="p-4 max-lg:p-0">
-        <div className="bg-white shadow-lg rounded-lg overflow-hidden">
-          <table className="w-full border-collapse">
-            <thead className="bg-gradient-to-r from-[#155CA5] to-blue-500 text-white">
+      {/* Products table */}
+      <div className="overflow-x-auto bg-white shadow rounded">
+        <table className="w-full border-collapse text-gray-700">
+          <thead className="bg-gradient-to-r from-blue-500 to-blue-700 text-white">
+            <tr>
+              <th className="py-2 px-3">Mahsulot</th>
+              <th className="py-2 px-3">Turi</th>
+              <th className="py-2 px-3">Sotish narxi</th>
+              <th className="py-2 px-3">Miqdor</th>
+              <th className="py-2 px-3">Umumiy foyda</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredProducts.length === 0 ? (
               <tr>
-                <th className="py-3 px-5 text-left text-sm max-md:text-[10px] font-semibold uppercase tracking-wide">
-                  Nomi
-                </th>
-                <th className="py-3 px-5 text-left text-sm max-md:text-[10px] font-semibold uppercase tracking-wide">
-                  Turi
-                </th>
-                <th className="py-3 px-5 text-left text-sm max-md:text-[10px] font-semibold uppercase tracking-wide">
-                  Narxi
-                </th>
-                <th className="py-3 px-5 text-left text-sm max-md:text-[10px] font-semibold uppercase tracking-wide">
-                  Miqdori
-                </th>
-                <th className="py-3 px-5 text-left text-sm max-md:text-[10px] font-semibold uppercase tracking-wide">
-                  Umumiy summa
-                </th>
+                <td colSpan="5" className="py-5 text-center text-gray-500 italic">
+                  Hozircha ma’lumot yo‘q...
+                </td>
               </tr>
-            </thead>
-
-            <tbody className="text-gray-700 divide-y divide-gray-200">
-              {filteredProducts.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan="5"
-                    className="text-center py-5 text-gray-500 italic"
-                  >
-                    Hozircha ma’lumot yo‘q...
-                  </td>
+            ) : (
+              filteredProducts.map((p) => (
+                <tr key={p.id} className="hover:bg-purple-50">
+                  <td className="py-2 px-3 font-medium">{p.name}</td>
+                  <td className="py-2 px-3">{p.type}</td>
+                  <td className="py-2 px-3 font-semibold">{convert(p.price)} {currency}</td>
+                  <td className="py-2 px-3">{p.quantity}</td>
+                  <td className="py-2 px-3 font-semibold">{convert((p.price - (p.buyPrice || 0)) * p.quantity)} {currency}</td>
                 </tr>
-              ) : (
-                filteredProducts.map((item) => (
-                  <tr
-                    key={item.id}
-                    className="hover:bg-purple-50 transition max-md:text-sm"
-                  >
-                    <td className="py-3 px-5 font-medium">{item.name}</td>
-                    <td className="py-3 px-5">{item.type}</td>
-                    <td className="py-3 px-5">
-                      {item.price.toLocaleString()} so‘m
-                    </td>
-                    <td className="py-3 px-5">{item.quantity}</td>
-                    <td className="py-3 px-5 font-semibold text-gray-900">
-                      {(item.price * item.quantity).toLocaleString()} so‘m
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };

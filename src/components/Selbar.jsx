@@ -1,16 +1,17 @@
 import React from "react";
 import { NavLink } from "react-router-dom";
-import { FaEdit, FaExchangeAlt, FaShoppingCart, FaUsers } from "react-icons/fa";
+import { FaEdit, FaShoppingCart, FaUsers } from "react-icons/fa";
 import { HiHome } from "react-icons/hi";
 import { MdOutlineAddBusiness, MdOutlineBusiness, MdOutlineSell } from "react-icons/md";
-
+import {TbBusinessplan} from "react-icons/tb"
 const Selbar = ({isOpenSelbar, setIsOpenSelbar}) => {
   console.log(isOpenSelbar);
   const menu = [
     { name: "Sklad", icon: <HiHome className="text-xl" />, path: "/" },
-    { name: "Buyurtmalar", icon: <FaShoppingCart className="text-xl" />, path: "/orders" },
-    { name: "Maxsulot qo'shish", icon: <MdOutlineAddBusiness className="text-2xl" />, path: "/addProducts" },
-    { name: "Maxsulot sotish", icon: <MdOutlineSell className="text-2xl" />, path: "/sellProducts" },
+    { name: "Zavodlar", icon: <MdOutlineAddBusiness className="text-2xl" />, path: "/factories" },
+    { name: "Sotib olish", icon:<FaShoppingCart className="text-xl" /> , path: "/buyProducts" },
+    { name: "Mijozlar", icon: <FaUsers className="text-2xl" />, path: "/customers" },
+    { name: "Sotish", icon: <TbBusinessplan className="text-2xl" />, path: "/sellProducts" },
     { name: "Narxlarni o'zgartirish", icon: <FaEdit className="text-2xl" />, path: "/editProducts" },
     // { name: "Mijozlar", icon: <FaUsers className="text-2xl" />, path: "/clients" },
   ];

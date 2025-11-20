@@ -11,9 +11,9 @@ const Navbar = ({setIsOpenSelbar}) => {
           <h3 className='text-3xl max-md:text-2xl font-bold'>UnCenter</h3>
         </div>
         <div className='flex items-center gap-10 max-sm:gap-5'>
-            <FaMoon className='text-xl'/>
+            {/* <FaMoon className='text-xl'/>
             <IoIosNotifications className='text-2xl' /> 
-            <FaUser className='text-xl' />
+            <FaUser className='text-xl' /> */}
             <button onClick={() => setIsOpenSelbar(true)}><FaBars className='text-xl sm:hidden'/></button>
         </div>
         

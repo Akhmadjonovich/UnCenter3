@@ -1,138 +1,234 @@
-import React, { useState, useEffect } from "react";
+// src/pages/SellProduct.jsx
+import { useState, useEffect } from "react";
+import { ref, onValue, update, push } from "firebase/database";
 import { db } from "../firebase";
-import { ref, onValue, update, remove } from "firebase/database";
 
-const SellProduct = () => {
-  const [products, setProducts] = useState([]);
-  const [selectedType, setSelectedType] = useState("");
-  const [filteredProducts, setFilteredProducts] = useState([]);
-  const [selectedProductId, setSelectedProductId] = useState("");
-  const [sellQuantity, setSellQuantity] = useState("");
+export default function SellProduct() {
+  const [products, setProducts] = useState({});
+  const [customers, setCustomers] = useState({});
+  const [selectedCustomerId, setSelectedCustomerId] = useState("");
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [productSearch, setProductSearch] = useState("");
+  const [cart, setCart] = useState([]);
+  const [pay, setPay] = useState(""); // boshida bo'sh
 
-  // 🔹 Barcha mahsulotlarni yuklash
+  // 🔹 Load products
   useEffect(() => {
     const productsRef = ref(db, "products");
-    onValue(productsRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        const loadedProducts = Object.entries(data).map(([id, value]) => ({
-          id,
-          ...value,
-        }));
-        setProducts(loadedProducts);
-      } else {
-        setProducts([]);
-      }
+    return onValue(productsRef, (snap) => {
+      setProducts(snap.val() || {});
     });
   }, []);
 
-  // 🔹 Tanlangan turdagi mahsulotlarni filterlash
+  // 🔹 Load customers
   useEffect(() => {
-    if (selectedType) {
-      const filtered = products.filter((p) => p.type === selectedType);
-      setFilteredProducts(filtered);
-      setSelectedProductId("");
-    }
-  }, [selectedType, products]);
+    const customersRef = ref(db, "customers");
+    return onValue(customersRef, (snap) => {
+      setCustomers(snap.val() || {});
+    });
+  }, []);
 
-  const handleSell = async (e) => {
-    e.preventDefault();
+  const filteredCustomers = Object.entries(customers).filter(([id, c]) =>
+    c.name.toLowerCase().includes(customerSearch.toLowerCase())
+  );
 
-    if (!selectedProductId || !sellQuantity) {
-      alert("Iltimos, mahsulot va miqdorni tanlang!");
+  const filteredProducts = Object.entries(products).filter(([id, p]) =>
+    p.name.toLowerCase().includes(productSearch.toLowerCase())
+  );
+
+  const addToCart = (productId, amount, unit, price) => {
+    const p = products[productId];
+    if (!p) return;
+    if (amount > p.quantity) {
+      alert(`Skladda yetarli miqdor yo'q! (${p.quantity} ${unit} mavjud)`);
       return;
     }
 
-    const productRef = ref(db, `products/${selectedProductId}`);
-    const selectedProduct = products.find((p) => p.id === selectedProductId);
-
-    if (!selectedProduct) {
-      alert("Mahsulot topilmadi!");
-      return;
-    }
-
-    const newQuantity = selectedProduct.quantity - Number(sellQuantity);
-
-    if (newQuantity < 0) {
-      alert("Sotish miqdori mavjud zaxiradan ko‘p!");
-      return;
-    }
-
-    try {
-      if (newQuantity === 0) {
-        // 🔥 Agar mahsulot miqdori 0 bo‘lsa, o‘chiramiz
-        await remove(productRef);
-        alert(`"${selectedProduct.name}" ombordan o‘chirildi (miqdor 0).`);
-      } else {
-        // 🔹 Aks holda miqdorni yangilaymiz
-        await update(productRef, { quantity: newQuantity });
-        alert("Mahsulot muvaffaqiyatli sotildi!");
-      }
-
-      // 🔄 Formani tozalash
-      setSellQuantity("");
-      setSelectedProductId("");
-    } catch (error) {
-      console.error("Xatolik:", error);
+    const exists = cart.find((c) => c.productId === productId);
+    if (exists) {
+      setCart(cart.map(c =>
+        c.productId === productId ? { ...c, quantity: c.quantity + amount, price } : c
+      ));
+    } else {
+      setCart([...cart, {
+        productId,
+        name: p.name,
+        type: p.type,
+        price,
+        quantity: amount,
+        unit,
+      }]);
     }
   };
 
+  const removeFromCart = (productId) => setCart(cart.filter(c => c.productId !== productId));
+
+  const totalCartPrice = cart.reduce((sum, c) => sum + c.price * c.quantity, 0);
+
+  const handleSell = () => {
+    if (!selectedCustomerId) return alert("Mijozni tanlang!");
+    if (cart.length === 0) return alert("Savatcha bo'sh!");
+    if (!pay || pay < 0) return alert("To‘lov summasini kiriting!");
+
+    const customer = customers[selectedCustomerId];
+    let remainingPay = Number(pay);
+
+    const updates = {};
+
+    // 🔹 Update products quantity
+    cart.forEach(c => {
+      const product = products[c.productId];
+      updates[`products/${c.productId}/quantity`] = product.quantity - c.quantity;
+    });
+
+    // 🔹 Prepare purchase history
+    const now = Date.now();
+    const totalPrice = totalCartPrice;
+    const totalPaid = Math.min(remainingPay, totalPrice);
+    const totalDebt = totalPrice - totalPaid;
+
+    const items = cart.map(c => ({
+      productId: c.productId,
+      productName: c.name,
+      productType: c.type,
+      amount: c.quantity,
+      amountType: c.unit,
+      price: c.price,
+      totalPrice: c.price * c.quantity
+    }));
+
+    // 🔹 Save one purchase with multiple items
+    push(ref(db, "customerPurchases"), {
+      customerId: selectedCustomerId,
+      items,
+      totalPrice,
+      paid: totalPaid,
+      debtLeft: totalDebt,
+      date: now
+    });
+
+    // 🔹 Update customer debt
+    updates[`customers/${selectedCustomerId}/debt`] = (customer.debt || 0) + totalDebt;
+
+    // 🔹 Push updates
+    update(ref(db), updates);
+
+    alert("Savdo muvaffaqiyatli amalga oshirildi!");
+    setCart([]);
+    setPay(""); // inputni bo‘shatish
+  };
+
   return (
-    <div className="max-w-md mt-20 mx-auto p-6 bg-white rounded-xl shadow-md">
-      <h2 className="text-xl font-bold mb-4">Mahsulot sotish</h2>
-      <form onSubmit={handleSell} className="space-y-3">
-        {/* 🔸 1. Mahsulot turi tanlanadi */}
+    <div className="p-6 mt-16">
+      <h1 className="text-2xl font-bold mb-4">Mahsulot sotish</h1>
+
+      {/* Mijoz tanlash */}
+      <div className="mb-4">
+        <input
+          type="text"
+          placeholder="Mijoz ismi bo'yicha qidirish..."
+          className="p-2 border rounded w-full mb-2"
+          value={customerSearch}
+          onChange={(e) => setCustomerSearch(e.target.value)}
+        />
         <select
-          value={selectedType}
-          onChange={(e) => setSelectedType(e.target.value)}
-          className="w-full border p-2 rounded"
-          required
+          className="p-2 border rounded w-full"
+          value={selectedCustomerId}
+          onChange={(e) => setSelectedCustomerId(e.target.value)}
         >
-          <option value="">Mahsulot turini tanlang</option>
-          <option value="un">Un</option>
-          <option value="yog">Yog'</option>
-          <option value="tuz">Tuz</option>
-          <option value="novvoy">Novvoy mahsulotlari</option>
+          <option value="">-- Mijozni tanlang --</option>
+          {filteredCustomers.map(([id, c]) => (
+            <option key={id} value={id}>
+              {c.name} ({c.phone})
+            </option>
+          ))}
         </select>
+      </div>
 
-        {/* 🔸 2. Tanlangan turdagi mahsulotlar */}
-        {selectedType && (
-          <select
-            value={selectedProductId}
-            onChange={(e) => setSelectedProductId(e.target.value)}
-            className="w-full border p-2 rounded"
-            required
-          >
-            <option value="">Mahsulotni tanlang</option>
-            {filteredProducts.map((product) => (
-              <option key={product.id} value={product.id}>
-                {product.name} — ({product.quantity} dona/kg)
-              </option>
-            ))}
-          </select>
-        )}
+      {/* Mahsulot qidirish */}
+      <input
+        type="text"
+        placeholder="Mahsulot bo'yicha qidirish..."
+        className="p-2 border rounded w-full mb-4"
+        value={productSearch}
+        onChange={(e) => setProductSearch(e.target.value)}
+      />
 
-        {/* 🔸 3. Sotiladigan miqdor */}
-        {selectedProductId && (
-          <input
-            type="number"
-            value={sellQuantity}
-            onChange={(e) => setSellQuantity(e.target.value)}
-            placeholder="Sotiladigan miqdor"
-            className="w-full border p-2 rounded"
-            required
-          />
-        )}
+      {/* Mahsulotlar */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        {filteredProducts.map(([id, p]) => (
+          <div key={id} className="p-4 bg-white shadow rounded">
+            <h3 className="font-semibold text-lg">{p.name}</h3>
+            <p className="text-sm">Turi: {p.type}</p>
+            <p className="text-xl font-bold text-red-600">{p.price.toLocaleString()} so'm</p>
+            <p>Miqdori: {p.quantity} {p.unit || "dona"}</p>
 
+            <div className="mt-2 flex gap-2">
+              <input
+                type="number"
+                min={1}
+                max={p.quantity}
+                placeholder="Miqdor"
+                className="p-1 border rounded w-1/3"
+                id={`amount-${id}`}
+              />
+              <input
+                type="number"
+                placeholder="Narx"
+                className="p-1 border rounded w-1/3"
+                id={`price-${id}`}
+                defaultValue={p.price}
+              />
+              <select id={`unit-${id}`} className="p-1 border rounded w-1/3">
+                <option value="dona">dona</option>
+                <option value="qop">qop</option>
+                <option value="kg">kg</option>
+              </select>
+              <button
+                className="px-2 py-1 bg-blue-600 text-white rounded"
+                onClick={() => {
+                  const amount = +document.getElementById(`amount-${id}`).value;
+                  const unit = document.getElementById(`unit-${id}`).value;
+                  const price = +document.getElementById(`price-${id}`).value;
+                  addToCart(id, amount, unit, price);
+                }}
+              >
+                Qo'shish
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Savatcha */}
+      <h2 className="text-xl font-semibold mb-2">Savatcha</h2>
+      {cart.length === 0 && <p>Hali mahsulot tanlanmagan</p>}
+      {cart.map(c => (
+        <div key={c.productId} className="flex justify-between bg-white p-2 rounded shadow mb-2">
+          <div>
+            <p>{c.name} ({c.type})</p>
+            <p>{c.quantity} {c.unit} x {c.price.toLocaleString()} so'm</p>
+          </div>
+          <button className="px-2 py-1 bg-red-600 text-white rounded" onClick={() => removeFromCart(c.productId)}>O'chirish</button>
+        </div>
+      ))}
+
+      <div className="mt-4">
+        <p className="font-semibold">Jami summa: {totalCartPrice.toLocaleString()} so'm</p>
+        <input
+          type="number"
+          className="p-2 border rounded w-full mt-2"
+          placeholder="Mijoz qancha to'layapti?"
+          value={pay}
+          onChange={(e) => setPay(e.target.value)}
+        />
         <button
-          type="submit"
-          className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700"
+          className="mt-2 px-4 py-2 bg-green-600 text-white rounded w-full"
+          onClick={handleSell}
         >
           Sotish
         </button>
-      </form>
+      </div>
     </div>
   );
-};
-
-export default SellProduct;
+}

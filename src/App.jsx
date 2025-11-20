@@ -1,11 +1,12 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Layout from "./layout/Layout";
-import Orders from "./pages/Orders";
-import AddProducts from "./pages/AddProducts";
+import AddProducts from "./pages/BuyProduct";
 import Customers from "./pages/Customers";
 import Dashboard from "./pages/Dashboard";
 import SellProduct from "./pages/SellProduct";
 import EditProduct from "./pages/EditProduct";
+import { FactoryDetail , FactoriesPage } from "./pages/Factories";
+import CustomersPage, { CustomerDetail } from "./pages/Customers";
 
 
 function App() {
@@ -21,18 +22,31 @@ function App() {
           }
         />
         <Route
-          path="/orders"
+          path="/revenue-details"
           element={
             <Layout>
-              <Orders />
+              <RevenueDetails />
             </Layout>
           }
         />
         <Route
-          path="/addProducts"
+          path="/factories"
           element={
             <Layout>
-              <AddProducts />
+              <FactoriesPage />
+            </Layout>
+          }
+        />
+         <Route
+          path="/factory/:id"
+          element={<FactoryDetailWrapper />}
+        />
+        
+        <Route
+          path="/buyProducts"
+          element={
+            <Layout>
+              <BuyProduct />
             </Layout>
           }
         />
@@ -44,6 +58,7 @@ function App() {
             </Layout>
           }
         />
+        
         <Route
           path="/editProducts"
           element={
@@ -52,17 +67,36 @@ function App() {
             </Layout>
           }
         />
+        {/* Customers */}
         <Route
-          path="/clients"
+          path="/customers"
           element={
             <Layout>
-              <Customers />
+              <CustomersPage />
             </Layout>
           }
+        />
+        <Route
+          path="/customer/:id"
+          element={<CustomerDetailWrapper />}
         />
       </Routes>
     </BrowserRouter>
   );
+}
+
+// 🔹 FactoryDetail ni route orqali zavod id bilan olish
+import { useParams } from "react-router-dom";
+import BuyProduct from "./pages/BuyProduct";
+import RevenueDetails from "./pages/RevenueDetails";
+const FactoryDetailWrapper = () => {
+  const { id } = useParams();
+  return <FactoryDetail id={id} />;
+};
+
+function CustomerDetailWrapper() {
+  const { id } = useParams();
+  return <CustomerDetail id={id} />;
 }
 
 export default App;
